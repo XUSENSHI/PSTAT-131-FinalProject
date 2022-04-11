@@ -1,0 +1,43 @@
+---
+title: "Final Project Memo"
+author: "Thomas Shi"
+date: "2022/4/11"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+The data set chosen is about the happiness score of people. I obtain it in Kaggle.
+
+Here is the link https://www.kaggle.com/datasets/ajaypalsinghlo/world-happiness-report-2022
+
+It has 146 observations, and it has 12 features, but only 10 of them will be used. Nine of them are predictor. 
+I will work with quantitative data. There are no missing data in this data set. 
+
+
+I am interesting in what factors will influence happiness of people and how they influence happiness of people. 
+The outcome I am interested in is the happiness score calculated by Gallup World Poll. It is used to measure the level 
+of people's happiness in different countries. 
+The question will be answered by a regression model because my data is quantitative. 
+I think GDP, social support, healthy life expectancy will be the most important factors. 
+The goal of my model will be inferential because the most significant goal of the project is to find out 
+what factors will increase the happiness of people. Then, people's lives can be improved.
+
+
+Timeline
+
+Start EDA next week, and finish it at the end of week 4
+
+Start model fitting at the beginning of week 5 and finish it in the end of week 7
+
+Start to check the solidty of my model, and do some adjustments to find the best fitted model in week 8 and 9
+
+Finish the conclusion and the report in week 10
+
+
+Question
+
+I really want to do this project but my sample size is relatively small, and how can I solve it?
+
+
+
