@@ -1,0 +1,450 @@
+---
+title: "Final Project"
+author: "Thomas Shi"
+date: "2022/5/31"
+output:
+  html_document: 
+    code_folding: hide
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+library(janitor)
+library(dplyr)
+library(ggplot2)
+library(tidymodels)
+library(tidyverse)
+library(corrplot)
+library(grid)
+library(gridExtra)
+library(glmnet)
+library(xgboost)
+library(ranger)
+library(vip)
+```
+
+## Introduction
+
+
+The purpose of this project is to generate a model to predict the happiness score of a country or region based on the predictors, and find out which predictor is the most influential on the happiness score.
+
+
+## What is happiness score?
+
+
+Happiness is a measurement of well-beings of a nation. Leading expert across the fields, economics, psychology, survey analysis, statistics, health, public policy and so on, investigate this measurement of happiness. It has six major factors: economic production which is explained by GDP per capital, social support, healthy life expectancy, freedom to make life choices, generosity, absence of corruption. These factors will contribute to the happiness. The assumption is as these factors increase, the happiness score will increase. There are one important factor that will decrease the happiness score which is the dystopia.
+
+## Loading Data
+
+
+The used data set is the World Happiness Report 2022. The report include happiness scores of 146 countries. The key variables are listed below. The happiness score is conducted and calculated by survey taken in each country. 
+
+`Rank`: The order of happiness score from low to high
+
+`Country`: The name of country
+
+`Happiness Score`: The average happiness score in each country
+
+`Whsiker-high`: The higher tail of happiness score
+
+`Whsiker-high`: The lower tail of happiness score
+
+`GDP`: The value used to explain the economic production. It is GDP per capital
+
+`Social Support`: The value represent the social support of the country
+
+`Dystopia`: The value represent the dystopia of the country
+
+`Healthy Life Expectancy`: The value represent the people's health condition of the country
+
+`Freedom`: The value represent people's freedom to make choices.
+
+`Generoisty`: The value represent people's generosity level of the country
+
+`Perceptions of Corruption`: The value represent people's ability to avoid corruption
+
+Load the data
+```{r class.source = 'fold-show', echo = T,}
+happy <- read.csv('happiness_score.csv')
+head(happy)
+```
+
+
+## Data Cleaning
+
+Clean Names, so the variable names are easy to organize
+```{r class.source = 'fold-show', echo = T}
+happy <- clean_names(happy)
+head(happy)
+```
+
+
+
+Exclude unimportant predictors
+We only want the average happiness score
+```{r class.source = 'fold-show', echo = T}
+happy2 <- happy %>% select(-whisker_high, -whisker_low)
+head(happy2)
+```
+
+
+Check Missing Values
+```{r class.source = 'fold-show', echo = T}
+cbind(
+   lapply(
+     lapply(happy2, is.na)
+     , sum)
+   )
+
+
+```
+
+There are no Missing values.
+
+
+## Data Split
+
+Training set will be 70 percent of the data and the testing set will be 30 percent of the data. Moreover, the splitting is stratified on the `happiness_score` which is the output variable
+```{r class.source = 'fold-show', echo = T}
+set.seed(3435)
+happy_split <- happy2 %>% 
+  initial_split(prop = 0.7, strata = "happiness_score")
+
+happy_train <- training(happy_split)
+happy_test <- testing(happy_split)
+
+dim(happy_train)
+dim(happy_test)
+
+```
+
+
+The size of training set is 100, and the size of testing size is 46 which will be enough
+
+## Exploratory Data Analysis
+
+
+Histogram of Happiness Score
+```{r class.source = 'fold-show', echo = T}
+ggplot(happy_train, aes(x=happiness_score)) + 
+  geom_histogram(bins = 20)
+
+
+```
+
+The histogram of Happiness Score is left-skewed. Most countries have a relatively high happiness score. The scores concentrate between 5 and 7. Most countries have happiness scores between 5 and 7
+
+
+Correlation Matrix
+```{r , echo = T}
+happy_train %>% 
+  select(where(is.numeric), -rank) %>% 
+  cor(use = "complete.obs") %>% 
+  corrplot(type = "lower", diag = FALSE)
+
+
+```
+
+`gdp`, `social support`, and `healthy life expectancy` have a strong positive relation with happiness score. They also have a strong positive relation with each other, so when fitting model, interaction may be a good choice.
+
+`dystopia` and `freedom` have a moderate positive relation with `happiness score` which contradict to my assumption. I assume `dystopia` has a negative relation with `happiness score`.
+
+`generosity` has no correlations with `dystopia` and `happiness score`, and has very weak correlation with other predictors, so I decide to exclude this predictor while fitting model.
+
+Although, `dystopia` has a moderate correlation with happiness score, but it has very weak correlation with all other scores, so I decide to exclude this predictor while fitting model.
+
+
+Scatter Plot between happiness score and each selected predictor
+```{r, echo = T, fig.height=10}
+g_gdp <- happy_train %>% ggplot(aes(x = happiness_score, y = gdp)) + geom_point()
+g_social <- happy_train %>% ggplot(aes(x = happiness_score, y = social_support)) + geom_point()
+g_health <- happy_train %>% ggplot(aes(x = happiness_score, y = healthy_life_expectancy)) + geom_point()
+g_free <- happy_train %>% ggplot(aes(x = happiness_score, y = freedom)) + geom_point()
+g_corrupt <- happy_train %>% ggplot(aes(x = happiness_score, y = perceptions_of_corruption)) + geom_point()
+grid.arrange(g_gdp, g_social, g_health, g_free, g_corrupt)
+
+```
+
+`gdp`, `social support`, `healthy life expectancy` and `freedom` have a roughly linear correlation with `happiness score`
+
+`perceptions of corruption` has a roughly positive quadratic relation with `happiness score`.
+
+
+By examining the correlation matrix, we can find out that correlation between `gdp` and `social support` is strong. Correlation between `gdp` and `healthy life expectation` is strong. Moreover, The correlation between `social support` and `healthy life expectation` is strong.
+
+Thus I decide to create a scatter plot of `gdp` against `social support`  ,a scatter plot of `GDP`, against `healthy life expenctancy`, and a scatter plot of `social support` against `healthy life expectancy`
+```{r, echo = T, fig.height = 10}
+gdp_plot1 <- happy_train %>% ggplot(aes(x = gdp, y = social_support)) + geom_point()
+gdp_plot2 <- happy_train %>% ggplot(aes(x = gdp, y = social_support)) + geom_point()
+sh_plot <- happy_train %>% ggplot(aes(x = social_support, y = healthy_life_expectancy)) + geom_point()
+grid.arrange(gdp_plot1, gdp_plot2, sh_plot)
+```
+
+
+From the graph we can see that `social_support` and `healthy life expectancy` has the strongest correlation, so I decide to set an interaction between them. 
+
+
+## Model Building
+
+
+Set up recipe
+```{r class.source = 'fold-show', echo = T}
+happy_recipe <- recipe(happiness_score ~ gdp + social_support + healthy_life_expectancy
+                       + freedom + perceptions_of_corruption, data = happy_train) %>%
+  step_interact(terms = ~ social_support : healthy_life_expectancy)
+
+happy_recipe <- happy_recipe %>%
+  step_scale(gdp, social_support, healthy_life_expectancy, freedom, perceptions_of_corruption)
+happy_recipe <- happy_recipe %>%
+  step_center(gdp, social_support, healthy_life_expectancy, freedom, perceptions_of_corruption)
+```
+
+
+Split model into 5 folds
+Use Cross validation to tune the model and select the best model using `rmse` as standard
+`rmse` is the root mean error square error which is a frequently used measure of the differences between values predicted by models and the observed value.
+```{r class.source = 'fold-show', echp = T}
+set.seed(13)
+happy_folds <- vfold_cv(happy_train, v = 5, strata = 'happiness_score')
+```
+
+Linear Regression
+```{r class.source = 'fold-show', echo = T}
+#set up linear model
+lm_model <- linear_reg() %>% 
+  set_engine("lm")
+
+#set up workflow for the model
+linear_wkf <- workflow() %>% 
+  add_recipe(happy_recipe) %>% 
+  add_model(lm_model)
+
+#fit the model
+linear_fit <- fit_resamples(linear_wkf, happy_folds)
+
+#evaluate performance 
+collect_metrics(linear_fit)
+
+```
+
+
+For linear regression model, the average rmse across fold is 0.518
+
+
+Tune Ridge Regression
+Both the `mixture` and `penalty` are tuned
+`mixture`: the proportion of L1 regularization, a number between 0 and 1 which represents the proportion of regularization that is used for L2 penalty
+
+`penalty`: It is the L2 penalty. The range is between -5 and 5 which is log scaled.
+```{r class.source = 'fold-show', echo = T}
+#set up ridge regression model
+ridge_spec <- linear_reg(mixture = tune(), penalty = tune()) %>%
+  set_mode("regression") %>%
+  set_engine("glmnet")
+
+#set up workflow for the model
+ridge_wkf <- workflow() %>% 
+  add_recipe(happy_recipe) %>% 
+  add_model(ridge_spec)
+
+#set up grid for tuning
+ridge_grid <- grid_regular(penalty(range = c(-5, 5)), 
+                        mixture(range = c(0, 1)), levels = 10)
+
+#tune the model
+ridge_res <- tune_grid(
+  ridge_wkf,
+  resamples = happy_folds, 
+  grid = ridge_grid,
+  matrics = matric_set(rmse)
+)
+
+autoplot(ridge_res)
+
+#show the result with best rmse
+ridge_matrix <- collect_metrics(ridge_res) %>% arrange(mean)
+ridge_matrix[1,]
+```
+
+
+The graph shows that as `penalty` increase the `rmse` increases. Model with low `mixture` value, `rmse` increases slower. The lowest average `rmse` across folds among all models is 0.510 which is lower than the linear regression model
+
+
+Tune Boost Tree
+`trees`: number of trees that will be fitted which will be tuned from range 10 to 1000
+```{r class.source = 'fold-show', echo = T}
+#set up boost tree model
+boost_model <- boost_tree(trees = tune()) %>%
+  set_engine("xgboost") %>%
+  set_mode("regression")
+
+#set up workflow for the model
+boost_wkf <- workflow() %>%
+  add_recipe(happy_recipe) %>%
+  add_model(boost_model)
+
+#set up the grid for tuning
+boost_grid <- grid_regular(trees(range = c(10, 1000)), levels = 10)
+
+#tune the model
+tune_res_boost <- tune_grid(
+  boost_wkf, 
+  resamples = happy_folds, 
+  grid = boost_grid, 
+  metrics = metric_set(rmse)
+)
+
+autoplot(tune_res_boost)
+
+#show the result with best rmse
+boost_matrix <- collect_metrics(tune_res_boost) %>% arrange(mean)
+boost_matrix[1,]
+
+```
+
+
+The graph shows that when the `trees` increase from 0 to 120, `rmse` decreases sharply and then it stay constant. The lowest average `rmse` across folds is 0.582 and it occurs when trees equal to 120 or higher. However, we always want the simplest model so we choose trees equal to 120. 0.582 is the highest `rmse` across all three models
+
+
+Tune random forest
+`m_try`, `min_n`, and `trees` will be tuned
+`m_try`: number of predictor used while fitting trees. The range will be from 1 to 5 since there are only five predictors.
+`min_n`: the stopping condition of splitting trees. If number of individuals in the node is less than this number, splitting will be stopped. The range is from 2 to 20
+`trees`: number of trees that will be fitted. The range is for 20 to 1000
+```{r class.source = 'fold-show', echo = T}
+#set up the model
+random_model <- 
+  rand_forest(
+              min_n = tune(),
+              mtry = tune(),
+              trees = tune(),
+              mode = "regression") %>% 
+  set_engine("ranger", importance = 'impurity')
+
+#set up the workflow for the model
+random_wkf <- workflow() %>%
+  add_recipe(happy_recipe) %>%
+  add_model(random_model)
+
+#build the grid for tuning
+random_grid <- grid_regular(mtry(range = c(1, 5)), 
+                           trees(range = c(20, 1000)), 
+                           min_n(range = c(2, 20)),
+                           levels = 5)
+
+
+#Tune the model
+tune_res_random <- tune_grid(
+  random_wkf, 
+  resamples = happy_folds, 
+  grid = random_grid, 
+  metrics = metric_set(rmse)
+)
+
+#Show the result with lowest rmse 
+autoplot(tune_res_random)
+random_matrix <- collect_metrics(tune_res_random) %>% arrange(mean)
+random_matrix[1,]
+```
+
+
+The graph shows that when we only use two predictors we can have the minimum `rmse` at most of time. Moreover, when we use 265 trees 6 nodes as minimum nodes and 2 predictors, we have the lowest average `rmse` across all the folds which is 0.490
+
+
+Tune decision tree
+The variable `cost_complexity` because we want to prune the tree to avoid overfitting. The range is from -4 to -1.
+```{r class.resource = 'fold-show', echo = T}
+#set up decision tree model
+tree_model <- decision_tree() %>%
+  set_mode("regression")
+
+#set up workflow for the model
+reg_tree_wf <- workflow() %>%
+  add_model(tree_model %>% set_args(cost_complexity = tune())) %>%
+  add_recipe(happy_recipe)
+
+#build the grid for tuning
+tree_grid <- grid_regular(cost_complexity(range = c(-4, -1)), levels = 10)
+
+#tune the model
+tune_res_tree <- tune_grid(
+  reg_tree_wf, 
+  resamples = happy_folds, 
+  grid = tree_grid, 
+  metrics = metric_set(rmse)
+)
+
+autoplot(tune_res_tree)
+
+#Show the model with best result
+tree_matrix <- collect_metrics(tune_res_tree) %>% arrange(mean)
+tree_matrix[1,]
+  
+```
+
+
+The graph shows that lower `cost_complexity` provides lower `rmse`. When the `cost_complexity` surpass about 1.007, `rmse` starts to increase. The lowest `rmse` occurs when `cost_complexity` equals to 1.0001 which is 0.640
+
+
+## Model Selection
+
+A table of performance of all models will be built to select the best model
+```{r, echo = T}
+Model <- c('Linear Regression', 'Ridge Regression', 'Boost Tree', 'Random Forest', 'Decision Tree')
+RMSE <- c(0.518, 0.510, 0.582, 0.490, 0.640)
+Model_Comparison <- data.frame(Model, RMSE)
+Model_Comparison
+```
+
+
+According to the table, Random Forest gives us the best `rmse` across all the folds. Random Forest will be selected as the best performing model.
+
+
+## Evaluate Prediction Performance
+
+Fit the Random Forest model to the testing set to test the prediction power of the model
+```{r class.source = 'fold-show', echo = T}
+#select the best model
+final_model <- select_best(tune_res_random)
+
+#set up workflow for the last model
+final_wkf <- finalize_workflow(random_wkf, final_model)
+
+#fit the model to the training set
+final_fit <- fit(final_wkf, data = happy_train)
+
+#Evaluate the model performance on the testing set
+multi_metric <- metric_set(rmse, rsq, mae)
+final_predict <- predict(final_fit, happy_test) %>% 
+  bind_cols(happy_test %>% select(happiness_score))
+multi_metric(final_predict, truth = happiness_score, estimate = .pred)
+
+```
+
+By examining the prediction result, we can find out that the random forest have a good prediction performance on predicting the happiness score of countries. The Root mean square error is 0.602 which is relatively small. The R-square is 0.705 which means that over 70 percent of variance can be explained by the model which is relatively high. 
+
+
+## Variable importance
+
+Use the `vip()` function to plot the importance of each variable
+```{r, echo = T}
+final_fit %>% extract_fit_engine() %>% vip()
+```
+
+
+The graph shows that `social support x healthy life expectancy` is the most important factor of predicting happiness score, and GDP is the second most important factor. Since all the variables have positive relationship with happiness score, interaction of social support and healthy life expectancy contribute the most to happiness and the well-beings of citizens. 
+
+
+
+## Conclusion
+
+The analysis gives a brief introduction of how to predict happiness scores of countries, including which model to use and which variables contribute the most.
+
+The first step is to do a data cleaning. I organize the variable names and exclude the variables that are not important: `whisker-higher` and `whisker-low`. Then I check if there are any missing values, and the result turns out that there are no missing values. After that, I split data into training set and testing set stratified by happiness score which is the output variable. The second step is to do an exploratory data analysis and feature selection. I build a correlation matrix to see the correlation between variables. I find out that 'generosity' has very weak correlation with all other variable, so I decide to exclude the variable. Also, `dystopia` has very weak correlation with all other variable except `happiness score`, so I exclude it as well. Then, I find out that there is a strong correlation between `social support` and `healthy life expectancy`, so I set up an interaction between them. The third step is to build models and select the best model between them and the standard is `rmse`. I split data into five folds stratified by `happiness score`. I build linear regression, ridge regression, boost trees, decision trees and random forest. I use the cross validation to tune the models and select the model with lowest average `rmse` across all folds. At last, I use the variable importance plots to determine the most significant predictor which is the interaction of `social support` and `healthy life expectancy`.
+
+Finally, it turns out random forest is the best performing model. I think there may be two reasons of that. First, it can detect the most important predictors and use them to fit models. It only use two variables which are interaction of `social support` and `healthy life expectancy`, and `gdp`. The second reason is that, totally, 265 trees were fitted. Therefore, many possible combinations of data are included, so the predicted result will tend to be stable and accurate. The most important factor is interaction of `social support` and `healthy life expectancy` which implies that health and support of government are the prior elements of citizen's will-beings.
+
+In conclusion, random forest is the best model so far. The happiness is mostly supported by GDP, social support and health condition. Therefore, I think the best way of building a happy society is to have strong economic basis and use the money to support people's lives and health condition. 
+
+
