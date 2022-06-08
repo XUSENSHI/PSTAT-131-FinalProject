@@ -360,7 +360,9 @@ happy_recipe &lt;- happy_recipe %&gt;%
   step_scale(gdp, social_support, healthy_life_expectancy, freedom, perceptions_of_corruption)
 happy_recipe &lt;- happy_recipe %&gt;%
   step_center(gdp, social_support, healthy_life_expectancy, freedom, perceptions_of_corruption)</code></pre>
-<p>Split model into 5 folds Use Cross validation to tune the model and select the best model using <code>rmse</code> as standard <code>rmse</code> is the root mean error square error which is a frequently used measure of the differences between values predicted by models and the observed value.</p>
+<p>Split model into 5 folds</p>
+<p>Use Cross validation to tune the model and select the best model using <code>rmse</code> as standard</p>
+<p><code>rmse</code> is the root mean error square error which is a frequently used measure of the differences between values predicted by models and the observed value.</p>
 <pre class="r fold-show"><code>set.seed(13)
 happy_folds &lt;- vfold_cv(happy_train, v = 5, strata = &#39;happiness_score&#39;)</code></pre>
 <p>Linear Regression</p>
@@ -384,7 +386,9 @@ collect_metrics(linear_fit)</code></pre>
 ## 1 rmse    standard   0.518     5  0.0259 Preprocessor1_Model1
 ## 2 rsq     standard   0.780     5  0.0277 Preprocessor1_Model1</code></pre>
 <p>For linear regression model, the average rmse across fold is 0.518</p>
-<p>Tune Elastic Net Regression Both the <code>mixture</code> and <code>penalty</code> are tuned <code>mixture</code>: the proportion of L1 regularization, a number between 0 and 1 which represents the proportion of regularization that is used for L2 penalty</p>
+<p>Tune Elastic Net Regression</p>
+<p>Both the <code>mixture</code> and <code>penalty</code> are tuned</p>
+<p><code>mixture</code>: the proportion of L1 regularization, a number between 0 and 1 which represents the proportion of regularization that is used for L2 penalty</p>
 <p><code>penalty</code>: It is the L2 penalty. The range is between -5 and 5 which is log scaled.</p>
 <pre class="r fold-show"><code>#set up ridge regression model
 ridge_spec &lt;- linear_reg(mixture = tune(), penalty = tune()) %&gt;%
@@ -418,7 +422,8 @@ ridge_matrix[1,]</code></pre>
 ##     &lt;dbl&gt;   &lt;dbl&gt; &lt;chr&gt;   &lt;chr&gt;      &lt;dbl&gt; &lt;int&gt;   &lt;dbl&gt; &lt;chr&gt;                 
 ## 1  0.0215       1 rmse    standard   0.510     5  0.0265 Preprocessor1_Model094</code></pre>
 <p>The graph shows that as <code>penalty</code> increase the <code>rmse</code> increases. Model with low <code>mixture</code> value, <code>rmse</code> increases slower. The lowest average <code>rmse</code> across folds among all models is 0.510 which is lower than the linear regression model</p>
-<p>Tune Boost Tree <code>trees</code>: number of trees that will be fitted which will be tuned from range 10 to 1000</p>
+<p>Tune Boost Tree</p>
+<p><code>trees</code>: number of trees that will be fitted which will be tuned from range 10 to 1000</p>
 <pre class="r fold-show"><code>#set up boost tree model
 boost_model &lt;- boost_tree(trees = tune()) %&gt;%
   set_engine(&quot;xgboost&quot;) %&gt;%
@@ -450,7 +455,11 @@ boost_matrix[1,]</code></pre>
 ##   &lt;int&gt; &lt;chr&gt;   &lt;chr&gt;      &lt;dbl&gt; &lt;int&gt;   &lt;dbl&gt; &lt;chr&gt;                
 ## 1   120 rmse    standard   0.582     5 0.00840 Preprocessor1_Model02</code></pre>
 <p>The graph shows that when the <code>trees</code> increase from 0 to 120, <code>rmse</code> decreases sharply and then it stay constant. The lowest average <code>rmse</code> across folds is 0.582 and it occurs when trees equal to 120 or higher. However, we always want the simplest model so we choose trees equal to 120. 0.582 is the highest <code>rmse</code> across all three models</p>
-<p>Tune random forest <code>m_try</code>, <code>min_n</code>, and <code>trees</code> will be tuned <code>m_try</code>: number of predictor used while fitting trees. The range will be from 1 to 5 since there are only five predictors. <code>min_n</code>: the stopping condition of splitting trees. If number of individuals in the node is less than this number, splitting will be stopped. The range is from 2 to 20 <code>trees</code>: number of trees that will be fitted. The range is for 20 to 1000</p>
+<p>Tune random forest</p>
+<p><code>m_try</code>, <code>min_n</code>, and <code>trees</code> will be tuned</p>
+<p><code>m_try</code>: number of predictor used while fitting trees. The range will be from 1 to 5 since there are only five predictors.</p>
+<p><code>min_n</code>: the stopping condition of splitting trees. If number of individuals in the node is less than this number, splitting will be stopped. The range is from 2 to 20</p>
+<p><code>trees</code>: number of trees that will be fitted. The range is for 20 to 1000</p>
 <pre class="r fold-show"><code>#set up the model
 random_model &lt;- 
   rand_forest(
@@ -490,7 +499,8 @@ random_matrix[1,]</code></pre>
 ##   &lt;int&gt; &lt;int&gt; &lt;int&gt; &lt;chr&gt;   &lt;chr&gt;      &lt;dbl&gt; &lt;int&gt;   &lt;dbl&gt; &lt;chr&gt;                
 ## 1     2   265     6 rmse    standard   0.490     5  0.0203 Preprocessor1_Model0~</code></pre>
 <p>The graph shows that when we only use two predictors we can have the minimum <code>rmse</code> at most of time. Moreover, when we use 265 trees 6 nodes as minimum nodes and 2 predictors, we have the lowest average <code>rmse</code> across all the folds which is 0.490</p>
-<p>Tune decision tree The variable <code>cost_complexity</code> because we want to prune the tree to avoid overfitting. The range is from -4 to -1.</p>
+<p>Tune decision tree</p>
+<p>Tune the variable <code>cost_complexity</code> because we want to prune the tree to avoid overfitting. The range is from -4 to -1.</p>
 <pre class="r"><code>#set up decision tree model
 tree_model &lt;- decision_tree() %&gt;%
   set_mode(&quot;regression&quot;)

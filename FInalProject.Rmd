@@ -202,7 +202,9 @@ happy_recipe <- happy_recipe %>%
 
 
 Split model into 5 folds
+
 Use Cross validation to tune the model and select the best model using `rmse` as standard
+
 `rmse` is the root mean error square error which is a frequently used measure of the differences between values predicted by models and the observed value.
 ```{r class.source = 'fold-show', echp = T}
 set.seed(13)
@@ -233,7 +235,9 @@ For linear regression model, the average rmse across fold is 0.518
 
 
 Tune Elastic Net Regression
+
 Both the `mixture` and `penalty` are tuned
+
 `mixture`: the proportion of L1 regularization, a number between 0 and 1 which represents the proportion of regularization that is used for L2 penalty
 
 `penalty`: It is the L2 penalty. The range is between -5 and 5 which is log scaled.
@@ -272,6 +276,7 @@ The graph shows that as `penalty` increase the `rmse` increases. Model with low 
 
 
 Tune Boost Tree
+
 `trees`: number of trees that will be fitted which will be tuned from range 10 to 1000
 ```{r class.source = 'fold-show', echo = T}
 #set up boost tree model
@@ -308,9 +313,13 @@ The graph shows that when the `trees` increase from 0 to 120, `rmse` decreases s
 
 
 Tune random forest
+
 `m_try`, `min_n`, and `trees` will be tuned
+
 `m_try`: number of predictor used while fitting trees. The range will be from 1 to 5 since there are only five predictors.
+
 `min_n`: the stopping condition of splitting trees. If number of individuals in the node is less than this number, splitting will be stopped. The range is from 2 to 20
+
 `trees`: number of trees that will be fitted. The range is for 20 to 1000
 ```{r class.source = 'fold-show', echo = T}
 #set up the model
@@ -353,7 +362,8 @@ The graph shows that when we only use two predictors we can have the minimum `rm
 
 
 Tune decision tree
-The variable `cost_complexity` because we want to prune the tree to avoid overfitting. The range is from -4 to -1.
+
+Tune the variable `cost_complexity` because we want to prune the tree to avoid overfitting. The range is from -4 to -1.
 ```{r class.resource = 'fold-show', echo = T}
 #set up decision tree model
 tree_model <- decision_tree() %>%
