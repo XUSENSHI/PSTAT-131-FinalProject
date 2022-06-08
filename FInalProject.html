@@ -384,7 +384,7 @@ collect_metrics(linear_fit)</code></pre>
 ## 1 rmse    standard   0.518     5  0.0259 Preprocessor1_Model1
 ## 2 rsq     standard   0.780     5  0.0277 Preprocessor1_Model1</code></pre>
 <p>For linear regression model, the average rmse across fold is 0.518</p>
-<p>Tune Ridge Regression Both the <code>mixture</code> and <code>penalty</code> are tuned <code>mixture</code>: the proportion of L1 regularization, a number between 0 and 1 which represents the proportion of regularization that is used for L2 penalty</p>
+<p>Tune Elastic Net Regression Both the <code>mixture</code> and <code>penalty</code> are tuned <code>mixture</code>: the proportion of L1 regularization, a number between 0 and 1 which represents the proportion of regularization that is used for L2 penalty</p>
 <p><code>penalty</code>: It is the L2 penalty. The range is between -5 and 5 which is log scaled.</p>
 <pre class="r fold-show"><code>#set up ridge regression model
 ridge_spec &lt;- linear_reg(mixture = tune(), penalty = tune()) %&gt;%
@@ -525,13 +525,13 @@ tree_matrix[1,]</code></pre>
 <div id="model-selection" class="section level2">
 <h2>Model Selection</h2>
 <p>A table of performance of all models will be built to select the best model</p>
-<pre class="r"><code>Model &lt;- c(&#39;Linear Regression&#39;, &#39;Ridge Regression&#39;, &#39;Boost Tree&#39;, &#39;Random Forest&#39;, &#39;Decision Tree&#39;)
+<pre class="r"><code>Model &lt;- c(&#39;Linear Regression&#39;, &#39;Elastic Net&#39;, &#39;Boost Tree&#39;, &#39;Random Forest&#39;, &#39;Decision Tree&#39;)
 RMSE &lt;- c(0.518, 0.510, 0.582, 0.490, 0.640)
 Model_Comparison &lt;- data.frame(Model, RMSE)
 Model_Comparison</code></pre>
 <pre><code>##               Model  RMSE
 ## 1 Linear Regression 0.518
-## 2  Ridge Regression 0.510
+## 2       Elastic Net 0.510
 ## 3        Boost Tree 0.582
 ## 4     Random Forest 0.490
 ## 5     Decision Tree 0.640</code></pre>
@@ -560,7 +560,7 @@ multi_metric(final_predict, truth = happiness_score, estimate = .pred)</code></p
 ## 1 rmse    standard       0.602
 ## 2 rsq     standard       0.705
 ## 3 mae     standard       0.455</code></pre>
-<p>By examining the prediction result, we can find out that the random forest have a good prediction performance on predicting the happiness score of countries. The Root mean square error is 0.602 which is relatively small. The R-square is 0.705 which means that over 70 percent of variance can be explained by the model which is relatively high.</p>
+<p>By examining the prediction result, we can find out that the random forest have a good prediction performance on predicting the happiness score of countries. The Root mean square error is 0.602 which is relatively small. The R-square is 0.705 which means that over 70 percent of variance can be explained by the model which is relatively high. However the model may have a problem of overfitting because the <code>rmse</code> in the testing set is a bit higher than the <code>rmse</code> across all folds</p>
 </div>
 <div id="variable-importance" class="section level2">
 <h2>Variable importance</h2>
@@ -572,7 +572,7 @@ multi_metric(final_predict, truth = happiness_score, estimate = .pred)</code></p
 <div id="conclusion" class="section level2">
 <h2>Conclusion</h2>
 <p>The analysis gives a brief introduction of how to predict happiness scores of countries, including which model to use and which variables contribute the most.</p>
-<p>The first step is to do a data cleaning. I organize the variable names and exclude the variables that are not important: <code>whisker-higher</code> and <code>whisker-low</code>. Then I check if there are any missing values, and the result turns out that there are no missing values. After that, I split data into training set and testing set stratified by happiness score which is the output variable. The second step is to do an exploratory data analysis and feature selection. I build a correlation matrix to see the correlation between variables. I find out that ‘generosity’ has very weak correlation with all other variable, so I decide to exclude the variable. Also, <code>dystopia</code> has very weak correlation with all other variable except <code>happiness score</code>, so I exclude it as well. Then, I find out that there is a strong correlation between <code>social support</code> and <code>healthy life expectancy</code>, so I set up an interaction between them. The third step is to build models and select the best model between them and the standard is <code>rmse</code>. I split data into five folds stratified by <code>happiness score</code>. I build linear regression, ridge regression, boost trees, decision trees and random forest. I use the cross validation to tune the models and select the model with lowest average <code>rmse</code> across all folds. At last, I use the variable importance plots to determine the most significant predictor which is the interaction of <code>social support</code> and <code>healthy life expectancy</code>.</p>
+<p>The first step is to do a data cleaning. I organize the variable names and exclude the variables that are not important: <code>whisker-higher</code> and <code>whisker-low</code>. Then I check if there are any missing values, and the result turns out that there are no missing values. After that, I split data into training set and testing set stratified by happiness score which is the output variable. The second step is to do an exploratory data analysis and feature selection. I build a correlation matrix to see the correlation between variables. I find out that ‘generosity’ has very weak correlation with all other variable, so I decide to exclude the variable. Also, <code>dystopia</code> has very weak correlation with all other variable except <code>happiness score</code>, so I exclude it as well. Then, I find out that there is a strong correlation between <code>social support</code> and <code>healthy life expectancy</code>, so I set up an interaction between them. The third step is to build models and select the best model between them and the standard is <code>rmse</code>. I split data into five folds stratified by <code>happiness score</code>. I build linear regression, elastic net regression, boost trees, decision trees and random forest. I use the cross validation to tune the models and select the model with lowest average <code>rmse</code> across all folds. At last, I use the variable importance plots to determine the most significant predictor which is the interaction of <code>social support</code> and <code>healthy life expectancy</code>.</p>
 <p>Finally, it turns out random forest is the best performing model. I think there may be two reasons of that. First, it can detect the most important predictors and use them to fit models. It only use two variables which are interaction of <code>social support</code> and <code>healthy life expectancy</code>, and <code>gdp</code>. The second reason is that, totally, 265 trees were fitted. Therefore, many possible combinations of data are included, so the predicted result will tend to be stable and accurate. The most important factor is interaction of <code>social support</code> and <code>healthy life expectancy</code> which implies that health and support of government are the prior elements of citizen’s will-beings.</p>
 <p>In conclusion, random forest is the best model so far. The happiness is mostly supported by GDP, social support and health condition. Therefore, I think the best way of building a happy society is to have strong economic basis and use the money to support people’s lives and health condition.</p>
 </div>
